@@ -1,8 +1,9 @@
 """Generate the catalogue for the current branch."""
+import json
 import shutil
 from html import escape
 from pathlib import Path
-from catalog import BASE_FIELDS, price_text, products
+from catalog import BASE_FIELDS, DETAIL_FIELDS, catalogue_pages, price_text, products
 
 ROOT = Path(__file__).resolve().parent
 
@@ -21,7 +22,7 @@ def shell(title, content, script=""):
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Północ — fikcyjny katalog sprzętu outdoorowego. Znajdź swój kierunek.">
 <title>{h(title)} · Północ</title><link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/assets/style.css">{script}</head><body>
+<link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/details.css">{script}</head><body>
 <a class="skip-link" href="#main">Przejdź do treści</a>
 <header class="header"><div class="header-inner"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">↗</span> północ<span class="brand-dot">.</span></a>
 <nav aria-label="Główna nawigacja"><a href="/#katalog">Katalog</a><a href="/o-katalogu.html">O katalogu</a></nav>
@@ -102,10 +103,39 @@ def about(output):
     write(output, 'robots.txt', 'User-agent: *\nAllow: /\n# Katalog edukacyjny. Zalecany odstęp między żądaniami: 0.5 s.\n')
 
 
+def pagination(page):
+    links = []
+    if page > 1:
+        links.append(f'<a rel="prev" href="/strona-{page - 1}.html#katalog">← Poprzednia</a>')
+    for number in range(1, 6):
+        current = ' aria-current="page"' if number == page else ''
+        links.append(f'<a href="/strona-{number}.html#katalog"{current}>{number}</a>')
+    if page < 5:
+        links.append(f'<a rel="next" href="/strona-{page + 1}.html#katalog">Następna →</a>')
+    return '<nav class="pagination" aria-label="Strony katalogu">' + ''.join(links) + '</nav>'
+
+
+def detail(product):
+    fields = {k: v for k, v in BASE_FIELDS.items() if k not in ('id', 'nazwa', 'cena', 'waluta', 'kategoria', 'url')}
+    original_page = (int(product['id'][3:]) - 1) // 40 + 1
+    return f'''<section class="detail-page"><a class="back-link" href="/strona-{original_page}.html#katalog">← Wróć do katalogu</a>
+<article class="produkt product-detail" data-id="{h(product['id'])}"><div class="detail-lead"><div><p class="eyebrow" data-pole="kategoria">{h(product['kategoria'])}</p><h1 data-pole="nazwa">{h(product['nazwa'])}</h1><p class="price" data-pole="cena" data-waluta="{h(product['waluta'])}">{h(price_text(product))}</p><a data-pole="url" class="permalink" href="{h(product['url'])}">Stały link do produktu ↗</a></div>
+<div class="detail-visual" aria-hidden="true"><span>↗</span><small>{h(product['id'])}</small></div></div>
+<div class="detail-columns"><section><h2>Informacje o produkcie</h2>{fields_dl(product, fields)}</section><section><h2>Specyfikacja techniczna</h2>{fields_dl(product, DETAIL_FIELDS)}</section></div></article></section>'''
+
+
 def build(destination=None):
     output = prepare_output(destination)
-    records = products(60)
-    write(output, 'index.html', shell('Katalog', hero(60) + listing(records)))
+    records = products(200)
+    for page, items in enumerate(catalogue_pages(records), start=1):
+        content = hero(len(records)) + listing(items) + pagination(page)
+        html = shell(f'Katalog — strona {page}', content,
+                     f'<link rel="canonical" href="/strona-{page}.html">')
+        write(output, f'strona-{page}.html', html)
+        if page == 1:
+            write(output, 'index.html', html)
+    for product in records:
+        write(output, f'produkty/{product["id"]}.html', shell(product['nazwa'], detail(product)))
     about(output)
     return output
 

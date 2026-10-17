@@ -1,4 +1,4 @@
-# Północ — katalog do parsowania, ocena 3.0
+# Północ — katalog do parsowania, ocena 4.0
 
 Serwis do laboratorium „Parser strony WWW”, część **AUTOR**. Dane, marki i ceny są fikcyjne. Serwis nie prowadzi sprzedaży.
 
@@ -7,7 +7,7 @@ Serwis do laboratorium „Parser strony WWW”, część **AUTOR**. Dane, marki 
 Wymagany **Python 3.10+**, bez bibliotek zewnętrznych.
 
 ```powershell
-git switch ocena-3
+git switch ocena-4
 python serve.py
 ```
 
@@ -15,17 +15,29 @@ Otwórz **http://127.0.0.1:8000**. Na Windows można użyć `py` zamiast `python
 
 Sama generacja: `python build_site.py`. Wynik: ignorowany katalog `public/`, gotowy do udostępnienia serwerem statycznym. Nie edytuj `public/`, bo jest odtwarzany przy każdym uruchomieniu. Serwer udostępnia wyłącznie `public/`, nie pliki repozytorium.
 
-## Wymagania na 3.0
+## Wymagania na 4.0
 
 | Wymaganie | Realizacja |
 | --- | --- |
-| Minimum 60 rekordów | 60 różnych produktów na `/` |
-| Minimum 10 atrybutów | 12 pól, opis poniżej |
-| Dwie struktury | 30 kart `article.produkt` i 30 wierszy `tr.produkt` |
+| Minimum 200 rekordów i paginacja | 200 unikalnych produktów, 208 wystąpień na 5 stronach |
+| Minimum 10 atrybutów na liście | 12 pól, opis poniżej |
+| Dwie struktury z poziomu 3.0 | Każda strona zawiera karty `article.produkt` i wiersze `tr.produkt` |
+| Osobna strona każdego produktu | 200 stron `/produkty/PN-XXXX.html` |
+| Minimum 8 dodatkowych atrybutów | 8 nowych pól w szczegółach, razem 20 |
 | Semantyczne klasy i identyfikatory | `.produkt`, `data-id`, `data-pole`, `#produkt-PN-0001` |
 | Statyczny HTML bez JavaScriptu | Pełna treść podczas generowania, brak skryptów |
 
-Pola: `id`, `nazwa`, `cena`, `waluta`, `kategoria`, `producent`, `dostepnosc`, `ocena`, `liczba_opinii`, `data_dodania`, `gwarancja`, `url`. Gwarancja jest w miesiącach. `id` jest w `data-id`, waluta w `data-waluta` przy cenie. Link na tym poziomie prowadzi do kotwicy produktu.
+Pola listy: `id`, `nazwa`, `cena`, `waluta`, `kategoria`, `producent`, `dostepnosc`, `ocena`, `liczba_opinii`, `data_dodania`, `gwarancja`, `url`. Gwarancja jest w miesiącach. `id` jest w `data-id`, waluta w `data-waluta` przy cenie. Link prowadzi do strony szczegółów.
+
+Pola dodatkowe (wyłącznie w szczegółach): `sku`, `ean`, `waga_g`, `wysokosc_cm`, `szerokosc_cm`, `glebokosc_cm`, `kolor`, `kraj_pochodzenia`. EAN jest tekstem, masa w gramach, wymiary w centymetrach.
+
+## Wybrane utrudnienia (3 wymagane)
+
+1. **Ceny lokalizowane i różne waluty.** Zapis `1 299,00 zł`, ze spacją nierozdzielającą U+00A0, oraz euro dla co siódmego produktu. Kod waluty jest przy cenie w `data-waluta`. Kwoty w różnych walutach nie nadają się do wspólnych statystyk bez przeliczenia; kurs użyty tylko do wygenerowania fikcyjnych cen EUR to 4,35 PLN/EUR.
+2. **Braki w dwóch polach u 20% produktów.** `producent` i `gwarancja` są puste u 40 z 200 unikalnych produktów. HTML ma puste elementy, a wizualną kreskę dodaje CSS. Brak nie jest tekstem `None` ani liczbą zero.
+3. **Dokładnie 8 duplikatów między stronami.** Produkty `PN-0001`–`PN-0008` występują na stronie 1 oraz pojedynczo na stronach 2–5. Identyfikator i wartości są takie same. Po deduplikacji zostaje 200 rekordów.
+
+Te utrudnienia ćwiczą normalizację cen, obsługę braków i deduplikację. Polskie znaki i encje HTML występują również w zwykłej treści, np. `Grań &amp; Szlak`.
 
 ## Dla partnera piszącego parser
 
@@ -33,6 +45,8 @@ Pola: `id`, `nazwa`, `cena`, `waluta`, `kategoria`, `producent`, `dostepnosc`, `
 - Pola mają `data-pole`, np. `[data-pole="cena"]`. Waluta: `data-waluta` tego elementu.
 - Link: `[data-pole="url"]` (w karcie to `a`, w tabeli `td` zawierające `a`).
 - Kodowanie: UTF-8. HTML zawiera rekordy bez wykonywania JS.
+- Zacznij od `/strona-1.html`; następne strony wskazuje `.pagination a[rel="next"]`. `/` i `/index.html` to aliasy strony 1, nie dodatkowe strony katalogu.
+- Dane szczegółowe są w `.product-detail [data-pole]`. Łącz z listą po `data-id`. Do eksportu usuń 8 nadmiarowych wystąpień.
 - Zalecany odstęp między żądaniami: co najmniej 0,5 s.
 
 ## Weryfikacja
@@ -41,7 +55,7 @@ Pola: `id`, `nazwa`, `cena`, `waluta`, `kategoria`, `producent`, `dostepnosc`, `
 python -m unittest discover -s tests -v
 ```
 
-Testy sprawdzają dane, oba rodzaje HTML, liczbę rekordów, pola, polskie znaki, brak JS i zasoby.
+Testy sprawdzają oba rodzaje HTML, 5 stron, 208 wystąpień/200 ID, rozrzucenie duplikatów, kompletność 200 stron szczegółów, 20 pól, braki, waluty, brak JS i poprawność wszystkich wewnętrznych odnośników.
 
 ## Gałęzie
 
