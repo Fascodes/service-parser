@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+public/
+.venv/
+test-results/
+node_modules/
