@@ -26,6 +26,11 @@ DETAIL_FIELDS = {
     "kraj_pochodzenia": "Kraj pochodzenia",
 }
 
+INTERACTIVE_FIELDS = {
+    'material': 'Materiał', 'zuzycie_energii_w': 'Zużycie energii (W)',
+    'koszt_dostawy': 'Koszt dostawy (PLN)', 'dostawca': 'Dostawca',
+}
+
 
 def products(count):
     result = []
@@ -65,6 +70,10 @@ def products(count):
             'glebokosc_cm': 5 + index * 2 % 30,
             'kolor': ('Leśna zieleń', 'Grafit', 'Piaskowy', 'Granat')[index % 4],
             'kraj_pochodzenia': ('Polska', 'Czechy', 'Niemcy', 'Szwecja')[index % 4],
+            'material': ('Poliamid', 'Poliester', 'Aluminium', 'Stal nierdzewna')[index % 4],
+            'zuzycie_energii_w': round(1 + (index % 12) * .5, 1) if product['kategoria'] in ('Oświetlenie', 'Nawigacja') else 0,
+            'koszt_dostawy': (0, 12.99, 15.99)[index % 3],
+            'dostawca': ('Leśna Logistyka', 'Szlak Dystrybucja', 'Północ Partner')[index % 3],
         })
     return result
 

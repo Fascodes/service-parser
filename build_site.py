@@ -3,7 +3,7 @@ import json
 import shutil
 from html import escape
 from pathlib import Path
-from catalog import BASE_FIELDS, DETAIL_FIELDS, catalogue_pages, price_text, products
+from catalog import BASE_FIELDS, DETAIL_FIELDS, INTERACTIVE_FIELDS, catalogue_pages, products
 
 ROOT = Path(__file__).resolve().parent
 
@@ -12,17 +12,12 @@ def h(value):
     return escape(str(value), quote=True)
 
 
-def value_text(product, field):
-    value = product.get(field)
-    return "" if value is None else str(value)
-
-
 def shell(title, content, script=""):
     return f'''<!doctype html>
 <html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="Północ — fikcyjny katalog sprzętu outdoorowego. Znajdź swój kierunek.">
 <title>{h(title)} · Północ</title><link rel="icon" href="/assets/mark.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/details.css">{script}</head><body>
+<link rel="stylesheet" href="/assets/style.css"><link rel="stylesheet" href="/assets/details.css"><link rel="stylesheet" href="/assets/dynamic.css">{script}</head><body>
 <a class="skip-link" href="#main">Przejdź do treści</a>
 <header class="header"><div class="header-inner"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">↗</span> północ<span class="brand-dot">.</span></a>
 <nav aria-label="Główna nawigacja"><a href="/#katalog">Katalog</a><a href="/o-katalogu.html">O katalogu</a></nav>
@@ -36,46 +31,6 @@ def hero(unique):
 <a class="button button-dark" href="#katalog">Odkryj katalog <span aria-hidden="true">↘</span></a></div>
 <div class="hero-map" aria-hidden="true"><div class="contour contour-one"></div><div class="contour contour-two"></div><div class="contour contour-three"></div><span class="map-north">N</span><span class="map-cross">✳</span><span class="map-location">52°13′ N &nbsp; 21°00′ E</span><span class="map-caption">POZA UTARTYM SZLAKIEM</span></div></section>
 <section class="stats" aria-label="Katalog w liczbach"><div><strong>{unique}</strong><span>produktów do odkrycia</span></div><div><strong>08</strong><span>kategorii na szlak</span></div><div><strong>01</strong><span>kierunek: przed siebie</span></div></section>'''
-
-
-def fields_dl(product, fields):
-    return '<dl class="product-facts">' + "".join(
-        f'<div><dt>{h(label)}</dt><dd data-pole="{field}">{h(value_text(product, field))}</dd></div>'
-        for field, label in fields.items()) + '</dl>'
-
-
-def card(product):
-    fields = {k: v for k, v in BASE_FIELDS.items() if k not in ("id", "nazwa", "cena", "waluta", "kategoria", "url")}
-    return f'''<article class="produkt product-card" data-id="{h(product['id'])}" id="produkt-{h(product['id'])}">
-<div class="product-visual" aria-hidden="true"><span>{h(product['kategoria'])}</span><strong>↗</strong><small>{h(product['id'])}</small></div>
-<div class="product-body"><span class="category" data-pole="kategoria">{h(product['kategoria'])}</span><h3 data-pole="nazwa">{h(product['nazwa'])}</h3>
-<p class="price" data-pole="cena" data-waluta="{h(product['waluta'])}">{h(price_text(product))}</p>
-{fields_dl(product, fields)}<a class="product-link" data-pole="url" href="{h(product['url'])}">Zobacz produkt <span aria-hidden="true">↗</span></a></div></article>'''
-
-
-def table(records):
-    fields = {k: v for k, v in BASE_FIELDS.items() if k not in ("id", "waluta")}
-    header = ''.join(f'<th scope="col">{h(label)}</th>' for label in fields.values())
-    rows = []
-    for product in records:
-        cells = []
-        for field in fields:
-            content, extra = h(value_text(product, field)), ''
-            if field == 'cena':
-                content = h(price_text(product))
-                extra = f' data-waluta="{h(product["waluta"])}"'
-            elif field == 'url':
-                content = f'<a href="{h(product[field])}">Zobacz ↗</a>'
-            cells.append(f'<td data-pole="{field}"{extra}>{content}</td>')
-        rows.append(f'<tr class="produkt" data-id="{h(product["id"])}" id="produkt-{h(product["id"])}">' + ''.join(cells) + '</tr>')
-    return f'''<div class="table-scroll" role="region" aria-label="Tabela produktów" tabindex="0"><table class="product-table"><caption>Produkty w zestawieniu tabelarycznym</caption><thead><tr>{header}</tr></thead><tbody>{''.join(rows)}</tbody></table></div>'''
-
-
-def listing(records):
-    midpoint = len(records) // 2
-    return f'''<section class="catalog-section" id="katalog"><div class="section-heading"><div><p class="eyebrow">DOBRZE BYĆ W DRODZE</p><h2>Wybierz swój ekwipunek</h2></div><span>{len(records)} pozycji</span></div>
-<div class="section-label"><h3>Na pierwszy plan</h3><span>01 — KARTY PRODUKTÓW</span></div><div class="product-grid">{''.join(card(p) for p in records[:midpoint])}</div>
-<div class="section-label table-label"><h3>Spójrz na szczegóły</h3><span>02 — ZESTAWIENIE</span></div>{table(records[midpoint:])}</section>'''
 
 
 def write(output, name, content):
@@ -115,27 +70,61 @@ def pagination(page):
     return '<nav class="pagination" aria-label="Strony katalogu">' + ''.join(links) + '</nav>'
 
 
-def detail(product):
-    fields = {k: v for k, v in BASE_FIELDS.items() if k not in ('id', 'nazwa', 'cena', 'waluta', 'kategoria', 'url')}
-    original_page = (int(product['id'][3:]) - 1) // 40 + 1
-    return f'''<section class="detail-page"><a class="back-link" href="/strona-{original_page}.html#katalog">← Wróć do katalogu</a>
-<article class="produkt product-detail" data-id="{h(product['id'])}"><div class="detail-lead"><div><p class="eyebrow" data-pole="kategoria">{h(product['kategoria'])}</p><h1 data-pole="nazwa">{h(product['nazwa'])}</h1><p class="price" data-pole="cena" data-waluta="{h(product['waluta'])}">{h(price_text(product))}</p><a data-pole="url" class="permalink" href="{h(product['url'])}">Stały link do produktu ↗</a></div>
-<div class="detail-visual" aria-hidden="true"><span>↗</span><small>{h(product['id'])}</small></div></div>
-<div class="detail-columns"><section><h2>Informacje o produkcie</h2>{fields_dl(product, fields)}</section><section><h2>Specyfikacja techniczna</h2>{fields_dl(product, DETAIL_FIELDS)}</section></div></article></section>'''
+def dynamic_listing(page):
+    headings = ''.join(f'<th scope="col">{h(label)}</th>' for key, label in BASE_FIELDS.items() if key not in ('id', 'waluta'))
+    return f'''<section class="catalog-section" id="katalog" data-strona="{page}">
+<div class="section-heading"><div><p class="eyebrow">DOBRZE BYĆ W DRODZE</p><h2>Wybierz swój ekwipunek</h2></div><span>Strona {page} z 5</span></div>
+<form class="filters" role="search" id="filtry"><label>Szukaj produktu<input type="search" id="szukaj" placeholder="Nazwa, marka, kierunek…" autocomplete="off"></label>
+<label>Kategoria<select id="kategoria"><option value="">Wszystkie kategorie</option></select></label>
+<label>Sortowanie<select id="sortowanie"><option value="domyslne">Kolejność katalogu</option><option value="nazwa">Nazwa A–Z</option><option value="cena-rosnaco">Cena w PLN: rosnąco</option><option value="cena-malejaco">Cena w PLN: malejąco</option><option value="ocena">Najwyższa ocena</option></select></label>
+<button class="reset-filters" type="reset">Wyczyść filtry ↺</button></form>
+<p class="filter-note">Filtry dotyczą wczytanych produktów na tej stronie. Ceny EUR porównujemy po kursie 4,35 PLN/EUR.</p>
+<div class="catalog-progress"><p id="licznik" role="status" aria-live="polite">Przygotowujemy katalog…</p><span class="progress-line" aria-hidden="true"><span id="postep"></span></span></div>
+<div id="stan-ladowania" class="loading-state" role="status" hidden><span class="spinner" aria-hidden="true"></span> Pakujemy kolejną porcję ekwipunku…</div>
+<div id="blad" class="error-state" role="alert" hidden></div><p id="brak-wynikow" class="empty-state" hidden>Nie znaleziono produktów. Zmień filtry lub wczytaj więcej.</p>
+<div id="wyniki" aria-busy="false"><div class="section-label"><h3>Na pierwszy plan</h3><span>01 — KARTY PRODUKTÓW</span></div><div class="product-grid" id="karty-produktow"></div>
+<div class="section-label table-label"><h3>Spójrz na szczegóły</h3><span>02 — ZESTAWIENIE</span></div><div class="table-scroll" role="region" aria-label="Tabela produktów" tabindex="0"><table class="product-table"><caption>Produkty w zestawieniu tabelarycznym</caption><thead><tr>{headings}</tr></thead><tbody id="wiersze-produktow"></tbody></table></div></div>
+<div class="load-more"><button class="button button-dark" id="wczytaj-wiecej" type="button" disabled>Wczytaj więcej ↓</button><p id="koniec" hidden>To już cały ekwipunek na tej stronie. Odkryj następną.</p></div>
+<noscript><p class="error-state">Włącz JavaScript, aby zobaczyć katalog i wczytywać produkty.</p></noscript></section>'''
+
+
+def dynamic_detail(identifier):
+    return f'''<section class="detail-page" id="szczegoly" data-id="{h(identifier)}"><a class="back-link" href="/strona-{(int(identifier[3:]) - 1) // 80 + 1}.html#katalog">← Wróć do katalogu</a>
+<div id="stan-ladowania" class="loading-state" role="status"><span class="spinner" aria-hidden="true"></span> Przygotowujemy szczegóły produktu…</div>
+<div id="blad" class="error-state" role="alert" hidden></div><button class="button button-dark" id="ponow-szczegoly" type="button" hidden>Spróbuj ponownie</button>
+<div id="produkt-szczegoly" aria-busy="true"></div><noscript><p class="error-state">Włącz JavaScript, aby zobaczyć informacje o produkcie.</p></noscript></section>'''
+
+
+def write_json(output, name, data):
+    write(output, name, json.dumps(data, ensure_ascii=False, indent=2) + '\n')
 
 
 def build(destination=None):
+    grade = json.loads((ROOT / 'site_config.json').read_text(encoding='utf-8'))['grade']
+    if grade != 5:
+        raise ValueError('Use the matching branch for another grade')
     output = prepare_output(destination)
-    records = products(200)
+    records = products(400)
+    write_json(output, 'data/schema.json', {'lista': BASE_FIELDS, 'szczegoly': DETAIL_FIELDS, 'interakcja': INTERACTIVE_FIELDS})
+    script = '<script type="module" src="/assets/app.js"></script>'
     for page, items in enumerate(catalogue_pages(records), start=1):
-        content = hero(len(records)) + listing(items) + pagination(page)
-        html = shell(f'Katalog — strona {page}', content,
-                     f'<link rel="canonical" href="/strona-{page}.html">')
+        chunks = [items[start:start + 24] for start in range(0, len(items), 24)]
+        filenames = []
+        for chunk_number, chunk in enumerate(chunks, start=1):
+            name = f'data/strona-{page}-porcja-{chunk_number}.json'
+            filenames.append('/' + name)
+            # The list never exposes the 12 detail attributes.
+            write_json(output, name, [{key: p[key] for key in BASE_FIELDS} for p in chunk])
+        write_json(output, f'data/strona-{page}.json', {'strona': page, 'liczba_rekordow': len(items), 'porcje': filenames})
+        content = hero(len(records)) + dynamic_listing(page) + pagination(page)
+        html = shell(f'Katalog — strona {page}', content, script + f'<link rel="canonical" href="/strona-{page}.html">')
         write(output, f'strona-{page}.html', html)
         if page == 1:
             write(output, 'index.html', html)
     for product in records:
-        write(output, f'produkty/{product["id"]}.html', shell(product['nazwa'], detail(product)))
+        write_json(output, f'data/produkty/{product["id"]}.json', product)
+        # Even the document title must not leak a record before JavaScript runs.
+        write(output, f'produkty/{product["id"]}.html', shell('Szczegóły produktu', dynamic_detail(product['id']), script))
     about(output)
     return output
 
