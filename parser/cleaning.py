@@ -4,6 +4,7 @@ Każdy konwerter przyjmuje surowy tekst i zwraca wartość docelowego typu albo
 zgłasza ValueError, gdy tekst jest niepoprawny. Pusty tekst oznacza brak danych
 i zawsze daje None, bez wyjątku.
 """
+import math
 import re
 from datetime import datetime
 
@@ -17,6 +18,18 @@ def clean_text(value):
     return re.sub(r"\s+", " ", str(value).replace("\xa0", " ")).strip()
 
 
+def to_finite_float(text):
+    """float() przyjmuje też 'inf', 'nan' i '1e309' (-> inf); takie wartości odrzucamy.
+
+    Sam zakres ich nie wyłapie: każde porównanie z NaN daje False, a inf przechodzi,
+    gdy pole nie ma górnej granicy.
+    """
+    value = float(text)
+    if not math.isfinite(value):
+        raise ValueError("wartość nie jest skończoną liczbą (inf/NaN)")
+    return value
+
+
 def parse_price(text):
     """'1299.00 PLN' / '1 299,00 zł' / '209,37 €' -> float."""
     text = clean_text(text)
@@ -27,7 +40,7 @@ def parse_price(text):
         raise ValueError("brak liczby w cenie")
     if "," in digits:
         digits = digits.replace(".", "").replace(",", ".")
-    value = float(digits)
+    value = to_finite_float(digits)
     if value <= 0:
         raise ValueError("cena musi być dodatnia")
     return value
@@ -39,7 +52,7 @@ def number(kind, minimum=None, maximum=None):
         text = clean_text(text).replace(" ", "").replace(",", ".")
         if not text:
             return None
-        value = float(text)
+        value = to_finite_float(text)
         if kind is int:
             if not value.is_integer():
                 raise ValueError("oczekiwano liczby całkowitej")

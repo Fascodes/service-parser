@@ -265,6 +265,17 @@ class CleaningTest(unittest.TestCase):
         self.assertRaises(ValueError, number(int), "1.5")
         self.assertEqual(number(int)("1 200"), 1200)
 
+    def test_rejects_inf_and_nan(self):
+        converters = [number(float, 0.1), number(float, 0, 5), number(int, 0), number(float)]
+        for value in ("inf", "-inf", "Infinity", "nan", "NaN", "1e309"):
+            for convert in converters:
+                with self.assertRaisesRegex(ValueError, "skończoną", msg=value):
+                    convert(value)
+        self.assertRaises(ValueError, parse_price, "9" * 400 + " zł")  # przepełnienie -> inf
+        record, rejected = clean_record({"waga_g": "nan", "wysokosc_cm": "inf", "ocena": "NaN"})
+        self.assertEqual((record["waga_g"], record["wysokosc_cm"], record["ocena"]), (None, None, None))
+        self.assertEqual({p["pole"] for p in rejected}, {"waga_g", "wysokosc_cm", "ocena"})
+
     def test_parse_ean_checksum(self):
         self.assertEqual(parse_ean("5901230000011"), "5901230000011")
         self.assertRaises(ValueError, parse_ean, "5901230000012")
