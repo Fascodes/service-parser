@@ -1,0 +1,7 @@
+requests>=2.31
+beautifulsoup4>=4.12
+# tryb przeglądarkowy (5.0); sterownik Chrome pobiera Selenium Manager
+selenium>=4.20
+# tylko analiza danych (parser/analiza.py)
+pandas>=2.0
+matplotlib>=3.8
